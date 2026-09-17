@@ -342,7 +342,7 @@
 </head>
 <body>
 
-    <h1>[ SYSTEM // CHESS ]</h1>
+    <h1>[ SYSTEM // HOLO_CHESS ]</h1>
     
     <div id="menu">
         <div id="my-info">INITIALIZING NEURAL LINK...</div>
@@ -353,7 +353,7 @@
         <div class="input-group">
             <input type="text" id="room-input" placeholder="輸入自訂房間代碼 (例: NEXUS_01)">
             <button onclick="createRoom()" class="secondary">建立房間</button>
-            <button onclick="joinRoom()">接入房間</button>
+            <button onclick="joinRoom()">進入房間</button>
         </div>
     </div>
 
@@ -379,7 +379,7 @@
 
     let peer = null;
     let conn = null;
-    let myRole = 'red'; // 預設紅方
+    let myRole = 'red'; 
     let currentTurn = 'red'; 
     let selectedPiece = null;
     let gameActive = false;
@@ -421,7 +421,7 @@
         { id: 'b_z2', type: '卒', color: 'black', x: 2, y: 3 },
         { id: 'b_z3', type: '卒', color: 'black', x: 4, y: 3 },
         { id: 'b_z4', type: '卒', color: 'black', x: 6, y: 3 },
-        { id: 'b_z5', type: '卒', color: 'black', x: 8, y: 3 }
+        { id: 'b_z5', type: '卒', x: 8, y: 3 }
     ];
     let pieces = [];
 
@@ -429,12 +429,20 @@
         pieces = JSON.parse(JSON.stringify(initialPieces));
     }
 
-    // 座標轉換：如果是 Black 視角，將棋盤座標上下左右鏡像反轉
-    function transformCoords(x, y) {
+    // 視角轉換：專門用來把「真實內部座標」轉成「當前玩家畫面上看到的顯示座標」
+    function getDisplayCoords(x, y) {
         if (!isLocalMode && myRole === 'black') {
             return { x: 8 - x, y: 9 - y };
         }
         return { x, y };
+    }
+
+    // 螢幕座標轉回真實內部座標
+    function getRealCoords(dispX, dispY) {
+        if (!isLocalMode && myRole === 'black') {
+            return { x: 8 - dispX, y: 9 - dispY };
+        }
+        return { x: dispX, y: dispY };
     }
 
     function resizeBoard() {
@@ -497,7 +505,7 @@
 
         peer.on('connection', (connection) => {
             conn = connection;
-            myRole = 'red'; // 建立房間者為紅方
+            myRole = 'red'; 
             setupConnection();
             document.getElementById('status').innerText = "[ 網路接通 ] 輪到 紅方 執行指令";
             gameActive = true;
@@ -532,7 +540,7 @@
         const customId = document.getElementById('room-input').value.trim();
         if (!customId) return alert('請先輸入自訂房間代碼！');
         isLocalMode = false;
-        myRole = 'red'; // 房主為紅方
+        myRole = 'red'; 
         resetPiecesData();
         initPeer(customId);
         alert(`[ 建立成功 ] 房間: ${customId} 已啟動，請將代碼傳給對手！`);
@@ -547,7 +555,7 @@
         if (!friendId) return alert('請輸入欲接入的房間代碼！');
 
         isLocalMode = false;
-        myRole = 'black'; // 加入房間者為黑方
+        myRole = 'black'; // 加入者為黑方
         resetPiecesData();
         conn = peer.connect(friendId);
         setupConnection();
@@ -561,10 +569,8 @@
     function setupConnection() {
         conn.on('data', (data) => {
             if (data.type === 'move') {
-                // 對方傳來的座標是依據對方的視角，需要轉回真實棋盤座標再套用
-                let realFrom = transformCoords(data.fromX, data.fromY);
-                let realTo = transformCoords(data.toX, data.toY);
-                applyMove(realFrom.x, realFrom.y, realTo.x, realTo.y);
+                // 收到對方的真實內部座標，直接在本地套用
+                applyMove(data.fromX, data.fromY, data.toX, data.toY);
                 currentTurn = myRole;
                 document.getElementById('status').innerText = `[ 輪到你了 ] 執行權：${myRole === 'red' ? '紅方' : '黑方'}`;
             }
@@ -612,17 +618,17 @@
         document.querySelectorAll('.piece, .hint').forEach(el => el.remove());
 
         pieces.forEach(p => {
-            // 套用視角轉換 (如果是黑方，將座標鏡像翻轉至下方)
-            let pos = transformCoords(p.x, p.y);
+            let disp = getDisplayCoords(p.x, p.y);
 
             let el = document.createElement('div');
             el.className = `piece ${p.color}`;
+            
             if (selectedPiece && selectedPiece.x === p.x && selectedPiece.y === p.y) {
                 el.classList.add('selected');
             }
             el.innerText = p.type;
-            el.style.left = (OFFSET_X + pos.x * GRID_SIZE) + 'px';
-            el.style.top = (OFFSET_Y + pos.y * GRID_SIZE) + 'px';
+            el.style.left = (OFFSET_X + disp.x * GRID_SIZE) + 'px';
+            el.style.top = (OFFSET_Y + disp.y * GRID_SIZE) + 'px';
             
             if (isTextRotated) {
                 el.style.transform = `translate(-50%, -50%) rotate(180deg)`;
@@ -641,11 +647,11 @@
         if (selectedPiece && canInteract) {
             let moves = getValidMoves(selectedPiece);
             moves.forEach(m => {
-                let hintPos = transformCoords(m.x, m.y);
+                let disp = getDisplayCoords(m.x, m.y);
                 let hint = document.createElement('div');
                 hint.className = 'hint';
-                hint.style.left = (OFFSET_X + hintPos.x * GRID_SIZE) + 'px';
-                hint.style.top = (OFFSET_Y + hintPos.y * GRID_SIZE) + 'px';
+                hint.style.left = (OFFSET_X + disp.x * GRID_SIZE) + 'px';
+                hint.style.top = (OFFSET_Y + disp.y * GRID_SIZE) + 'px';
                 hint.onclick = (e) => {
                     e.stopPropagation();
                     executeMove(selectedPiece.x, selectedPiece.y, m.x, m.y);
@@ -657,7 +663,7 @@
 
     function triggerWeightedChromaEffect(realX, realY, targetType) {
         const container = document.getElementById('board-container');
-        let pos = transformCoords(realX, realY);
+        let disp = getDisplayCoords(realX, realY);
         let weight = getPieceWeight(targetType); 
 
         let maxScale = 2.0 + (weight * 0.6);       
@@ -691,8 +697,8 @@
         for (let i = 0; i < ringCount; i++) {
             let ring = document.createElement('div');
             ring.className = 'weighted-kill-ring';
-            ring.style.left = (OFFSET_X + pos.x * GRID_SIZE) + 'px';
-            ring.style.top = (OFFSET_Y + pos.y * GRID_SIZE) + 'px';
+            ring.style.left = (OFFSET_X + disp.x * GRID_SIZE) + 'px';
+            ring.style.top = (OFFSET_Y + disp.y * GRID_SIZE) + 'px';
             ring.style.width = `${30 + (i * 10)}px`;
             ring.style.height = `${30 + (i * 10)}px`;
             ring.style.setProperty('--ring-color', i === 0 ? '#ffffff' : accentColor);
@@ -707,8 +713,8 @@
         flash.className = 'weighted-kill-flash';
         flash.style.setProperty('--flash-color', accentColor);
         flash.style.setProperty('--flash-max', `${2.0 + (weight * 0.3)}`);
-        flash.style.left = (OFFSET_X + pos.x * GRID_SIZE) + 'px';
-        flash.style.top = (OFFSET_Y + pos.y * GRID_SIZE) + 'px';
+        flash.style.left = (OFFSET_X + disp.x * GRID_SIZE) + 'px';
+        flash.style.top = (OFFSET_Y + disp.y * GRID_SIZE) + 'px';
         container.appendChild(flash);
         setTimeout(() => flash.remove(), 350);
     }
@@ -750,10 +756,8 @@
         
         if (!isLocalMode) {
             if (conn && conn.open) {
-                // 傳送給對方時，將座標轉為對方的視角再發送
-                let sendFrom = transformCoords(fromX, fromY);
-                let sendTo = transformCoords(toX, toY);
-                conn.send({ type: 'move', fromX: sendFrom.x, fromY: sendFrom.y, toX: sendTo.x, toY: sendTo.y });
+                // 直接傳送真實棋盤內部座標給對手，避免雙方座標對不上
+                conn.send({ type: 'move', fromX: fromX, fromY: fromY, toX: toX, toY: toY });
             }
             currentTurn = (myRole === 'red' ? 'black' : 'red');
             document.getElementById('status').innerText = `[ 網路等待 ] 敵方正在執行回應指令...`;
@@ -769,6 +773,8 @@
     function applyMove(fromX, fromY, toX, toY) {
         let targetPiece = getPieceAt(toX, toY);
         let movingPiece = getPieceAt(fromX, fromY);
+
+        if (!movingPiece) return;
 
         if (targetPiece) {
             triggerWeightedChromaEffect(toX, toY, targetPiece.type);
@@ -809,7 +815,6 @@
                     }
                 });
 
-                // 王見王飛將特性
                 let opponentKing = pieces.find(tp => (tp.type === '將' || tp.type === '帥') && tp.color !== color);
                 if (opponentKing && opponentKing.x === p.x) {
                     let minY = Math.min(p.y, opponentKing.y);
