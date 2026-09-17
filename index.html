@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CYBER_CHESS</title>
+    <title>CYBER_CHESS // V5</title>
     <!-- 引入 PeerJS CDN -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
@@ -342,18 +342,18 @@
 </head>
 <body>
 
-    <h1>[ SYSTEM // HOLO_CHESS ]</h1>
+    <h1>[ SYSTEM // CHESS ]</h1>
     
     <div id="menu">
         <div id="my-info">INITIALIZING NEURAL LINK...</div>
         <hr style="border:0; border-top:1px solid #1e293b; margin:2px 0;">
         <div style="text-align: center; margin-bottom: 5px;">
-            <button onclick="startLocalGame()" class="warning" style="width: 100%;">啟動本地雙人對戰 (同機)</button>
+            <button onclick="startLocalGame()" class="warning" style="width: 100%;">本地雙人對戰 (同機)</button>
         </div>
         <div class="input-group">
-            <input type="text" id="room-input" placeholder="輸入自訂房間代碼 (例: NEXUS_01)">
+            <input type="text" id="room-input" placeholder="輸入自訂房間代碼 (例: ABC_01)">
             <button onclick="createRoom()" class="secondary">建立房間</button>
-            <button onclick="joinRoom()">進入房間</button>
+            <button onclick="joinRoom()">接入房間</button>
         </div>
     </div>
 
@@ -421,7 +421,7 @@
         { id: 'b_z2', type: '卒', color: 'black', x: 2, y: 3 },
         { id: 'b_z3', type: '卒', color: 'black', x: 4, y: 3 },
         { id: 'b_z4', type: '卒', color: 'black', x: 6, y: 3 },
-        { id: 'b_z5', type: '卒', x: 8, y: 3 }
+        { id: 'b_z5', type: '卒', color: 'black', x: 8, y: 3 }  // <-- 已在此處補上遺漏的 color: 'black'
     ];
     let pieces = [];
 
@@ -429,7 +429,6 @@
         pieces = JSON.parse(JSON.stringify(initialPieces));
     }
 
-    // 視角轉換：專門用來把「真實內部座標」轉成「當前玩家畫面上看到的顯示座標」
     function getDisplayCoords(x, y) {
         if (!isLocalMode && myRole === 'black') {
             return { x: 8 - x, y: 9 - y };
@@ -437,7 +436,6 @@
         return { x, y };
     }
 
-    // 螢幕座標轉回真實內部座標
     function getRealCoords(dispX, dispY) {
         if (!isLocalMode && myRole === 'black') {
             return { x: 8 - dispX, y: 9 - dispY };
@@ -555,7 +553,7 @@
         if (!friendId) return alert('請輸入欲接入的房間代碼！');
 
         isLocalMode = false;
-        myRole = 'black'; // 加入者為黑方
+        myRole = 'black'; 
         resetPiecesData();
         conn = peer.connect(friendId);
         setupConnection();
@@ -569,7 +567,6 @@
     function setupConnection() {
         conn.on('data', (data) => {
             if (data.type === 'move') {
-                // 收到對方的真實內部座標，直接在本地套用
                 applyMove(data.fromX, data.fromY, data.toX, data.toY);
                 currentTurn = myRole;
                 document.getElementById('status').innerText = `[ 輪到你了 ] 執行權：${myRole === 'red' ? '紅方' : '黑方'}`;
@@ -756,7 +753,6 @@
         
         if (!isLocalMode) {
             if (conn && conn.open) {
-                // 直接傳送真實棋盤內部座標給對手，避免雙方座標對不上
                 conn.send({ type: 'move', fromX: fromX, fromY: fromY, toX: toX, toY: toY });
             }
             currentTurn = (myRole === 'red' ? 'black' : 'red');
