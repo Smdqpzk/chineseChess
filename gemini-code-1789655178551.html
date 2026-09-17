@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER_CHESS // 2077 - 王見王飛將模式</title>
+    <!-- 引入 PeerJS CDN -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --board-w: 540px;
+            --board-h: 600px;
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff0055;
+            --neon-green: #00ff66;
+            --bg-dark: #0a0b10;
+        }
+
+        body {
+            font-family: 'Share Tech Mono', 'Courier New', Courier, monospace, 'Microsoft JhengHei';
+            background-color: var(--bg-dark);
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            margin: 10px 0;
+            color: var(--neon-blue);
+            font-size: 1.8rem;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.6), 0 0 20px rgba(0, 243, 255, 0.2);
+            letter-spacing: 2px;
+        }
+
+        #menu {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--neon-blue);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2), inset 0 0 10px rgba(0, 243, 255, 0.1);
+            margin-bottom: 15px;
+            width: 100%;
+            max-width: 500px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            backdrop-filter: blur(5px);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 14px;
+            background: #030712;
+            border: 1px solid #1e293b;
+            color: var(--neon-blue);
+            border-radius: 4px;
+            font-size: 1rem;
+            outline: none;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 8px rgba(0, 243, 255, 0.4), inset 0 0 5px rgba(0, 243, 255, 0.2);
+        }
+
+        button {
+            padding: 10px 18px;
+            background: transparent;
+            color: var(--neon-blue);
+            border: 1px solid var(--neon-blue);
+            border-radius: 4px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: 0 0 5px rgba(0, 243, 255, 0.2);
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background: var(--neon-blue);
+            color: var(--bg-dark);
+            box-shadow: 0 0 15px var(--neon-blue);
+            transform: translateY(-1px);
+        }
+
+        button.secondary {
+            color: var(--neon-green);
+            border-color: var(--neon-green);
+            box-shadow: 0 0 5px rgba(0, 255, 102, 0.2);
+        }
+        button.secondary:hover {
+            background: var(--neon-green);
+            color: var(--bg-dark);
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+
+        button.warning {
+            color: #f59e0b;
+            border-color: #f59e0b;
+            box-shadow: 0 0 5px rgba(245, 158, 11, 0.2);
+        }
+        button.warning:hover {
+            background: #f59e0b;
+            color: var(--bg-dark);
+            box-shadow: 0 0 15px #f59e0b;
+        }
+
+        button.danger {
+            color: #ef4444;
+            border-color: #ef4444;
+            box-shadow: 0 0 5px rgba(239, 68, 68, 0.2);
+        }
+        button.danger:hover {
+            background: #ef4444;
+            color: var(--bg-dark);
+            box-shadow: 0 0 15px #ef4444;
+        }
+
+        #game-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            width: 100%;
+            max-width: 500px;
+            justify-content: center;
+        }
+
+        #status {
+            font-weight: bold;
+            color: var(--neon-pink);
+            font-size: 1.1rem;
+            text-align: center;
+            margin-bottom: 10px;
+            min-height: 1.5em;
+            text-shadow: 0 0 8px rgba(255, 0, 85, 0.5);
+            letter-spacing: 1px;
+        }
+
+        #my-info {
+            font-size: 0.95rem;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        #board-wrapper {
+            width: var(--board-w);
+            height: var(--board-h);
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        #board-container {
+            position: absolute;
+            width: var(--board-w);
+            height: var(--board-h);
+            background-color: #0d1117;
+            border: 2px solid var(--neon-blue);
+            border-radius: 6px;
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.25), inset 0 0 30px rgba(0, 243, 255, 0.05);
+            transform-origin: top left;
+            transition: border-color 0.3s ease;
+        }
+
+        /* 黑白與跳色反相畫面震動特效 */
+        @keyframes screenShakeBW {
+            0% { transform: translate(0, 0) scale(var(--base-scale, 1)); filter: grayscale(0) brightness(1) invert(0); }
+            20% { transform: translate(var(--shake-x1), var(--shake-y1)) scale(var(--base-scale, 1)); filter: grayscale(1) brightness(var(--fx-bright)) invert(var(--fx-invert)); }
+            40% { transform: translate(var(--shake-x2), var(--shake-y2)) scale(var(--base-scale, 1)); filter: grayscale(0.8) brightness(1.4) invert(0); }
+            60% { transform: translate(var(--shake-x3), var(--shake-y3)) scale(var(--base-scale, 1)); filter: grayscale(1) brightness(var(--fx-bright)) invert(var(--fx-invert)); }
+            80% { transform: translate(var(--shake-x4), var(--shake-y4)) scale(var(--base-scale, 1)); filter: grayscale(0.2) brightness(1.2) invert(0); }
+            100% { transform: translate(0, 0) scale(var(--base-scale, 1)); filter: grayscale(0) brightness(1) invert(0); }
+        }
+        .shaking {
+            animation: screenShakeBW 0.45s ease-in-out;
+        }
+
+        .line-h {
+            position: absolute;
+            height: 1px;
+            background-color: rgba(0, 243, 255, 0.4);
+            box-shadow: 0 0 4px rgba(0, 243, 255, 0.3);
+            width: 480px;
+            left: 30px;
+        }
+
+        .line-v {
+            position: absolute;
+            width: 1px;
+            background-color: rgba(0, 243, 255, 0.4);
+            box-shadow: 0 0 4px rgba(0, 243, 255, 0.3);
+            height: 240px;
+            top: 30px;
+        }
+
+        .cross {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-left: 1px solid rgba(0, 243, 255, 0.4);
+            border-right: 1px solid rgba(0, 243, 255, 0.4);
+            top: 30px;
+            left: 210px;
+        }
+
+        .river-text {
+            position: absolute;
+            top: 282px;
+            width: 100%;
+            text-align: center;
+            font-size: 20px;
+            color: rgba(0, 243, 255, 0.35);
+            letter-spacing: 40px;
+            user-select: none;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+        }
+
+        .piece {
+            position: absolute;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: bold;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            user-select: none;
+            z-index: 10;
+        }
+
+        .piece.red {
+            color: #ff3366;
+            border: 2px solid #ff3366;
+            box-shadow: 0 0 10px rgba(255, 51, 102, 0.5), inset 0 0 5px rgba(255, 51, 102, 0.3);
+        }
+
+        .piece.black {
+            color: #00f3ff;
+            border: 2px solid #00f3ff;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.5), inset 0 0 5px rgba(0, 243, 255, 0.3);
+        }
+
+        .piece:hover {
+            transform: translate(-50%, -50%) scale(1.12);
+        }
+
+        .piece.selected {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translate(-50%, -50%) scale(1.15);
+            animation: selectPulse 1s infinite alternate;
+        }
+
+        @keyframes selectPulse {
+            0% { box-shadow: 0 0 10px #fff; }
+            100% { box-shadow: 0 0 20px #fff, 0 0 35px var(--neon-blue); }
+        }
+
+        .hint {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-color: var(--neon-green);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            z-index: 15;
+            box-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green);
+            animation: hintPulse 1.2s infinite;
+        }
+
+        @keyframes hintPulse {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.6; }
+            50% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.6; }
+        }
+
+        /* 黑白與跳色震波環特效 */
+        .weighted-kill-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 3px solid var(--ring-color, #ffffff);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 25;
+            animation: weightedExplosionBW 0.5s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+        }
+
+        @keyframes weightedExplosionBW {
+            0% {
+                transform: translate(-50%, -50%) scale(0.2);
+                opacity: 1;
+                box-shadow: 0 0 20px var(--ring-color), inset 0 0 15px var(--ring-color);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(var(--final-scale, 4));
+                opacity: 0;
+                box-shadow: 0 0 calc(var(--final-scale) * 15px) var(--ring-color), inset 0 0 30px var(--ring-color);
+            }
+        }
+
+        .weighted-kill-flash {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, #ffffff 20%, var(--flash-color, #000000) 70%, transparent 100%);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 30;
+            animation: weightedFlashBurstBW 0.3s ease-out forwards;
+        }
+
+        @keyframes weightedFlashBurstBW {
+            0% { transform: translate(-50%, -50%) scale(0.3); opacity: 1; filter: drop-shadow(0 0 20px var(--flash-color)); }
+            100% { transform: translate(-50%, -50%) scale(var(--flash-max, 2.5)); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>[ SYSTEM // HOLO_CHESS ]</h1>
+    
+    <div id="menu">
+        <div id="my-info">INITIALIZING NEURAL LINK...</div>
+        <hr style="border:0; border-top:1px solid #1e293b; margin:2px 0;">
+        <div style="text-align: center; margin-bottom: 5px;">
+            <button onclick="startLocalGame()" class="warning" style="width: 100%;">啟動本地雙人對戰 (同機)</button>
+        </div>
+        <div class="input-group">
+            <input type="text" id="room-input" placeholder="輸入自訂房間代碼 (例: NEXUS_01)">
+            <button onclick="createRoom()" class="secondary">建立全息房</button>
+            <button onclick="joinRoom()">接入房間</button>
+        </div>
+    </div>
+
+    <div id="game-controls" style="display: none;">
+        <button onclick="toggleTextRotate()" class="secondary">🔄 反轉棋子文字</button>
+        <button onclick="returnToMenu()" class="danger">🏠 返回主選單</button>
+    </div>
+
+    <div id="status">請選擇對戰模式 (本地或網路)</div>
+
+    <div id="board-wrapper">
+        <div id="board-container">
+            <div class="river-text">CYBER_ZONE</div>
+        </div>
+    </div>
+
+<script>
+    const BOARD_COLS = 9;
+    const BOARD_ROWS = 10;
+    const GRID_SIZE = 60;
+    const OFFSET_X = 30;
+    const OFFSET_Y = 30;
+
+    let peer = null;
+    let conn = null;
+    let myRole = null; 
+    let currentTurn = 'red'; 
+    let selectedPiece = null;
+    let gameActive = false;
+    let isLocalMode = false; 
+    let isTextRotated = false;
+
+    const ACCENT_COLORS = ['#ffffff', '#ff0055', '#00ff66', '#ffcc00'];
+
+    let initialPieces = [
+        { id: 'r_c1', type: '車', color: 'red', x: 0, y: 9 },
+        { id: 'r_m1', type: '馬', color: 'red', x: 1, y: 9 },
+        { id: 'r_x1', type: '相', color: 'red', x: 2, y: 9 },
+        { id: 'r_s1', type: '仕', color: 'red', x: 3, y: 9 },
+        { id: 'r_k0', type: '帥', color: 'red', x: 4, y: 9 },
+        { id: 'r_s2', type: '仕', color: 'red', x: 5, y: 9 },
+        { id: 'r_x2', type: '相', color: 'red', x: 6, y: 9 },
+        { id: 'r_m2', type: '馬', color: 'red', x: 7, y: 9 },
+        { id: 'r_c2', type: '車', color: 'red', x: 8, y: 9 },
+        { id: 'r_p1', type: '炮', color: 'red', x: 1, y: 7 },
+        { id: 'r_p2', type: '炮', color: 'red', x: 7, y: 7 },
+        { id: 'r_z1', type: '兵', color: 'red', x: 0, y: 6 },
+        { id: 'r_z2', type: '兵', color: 'red', x: 2, y: 6 },
+        { id: 'r_z3', type: '兵', color: 'red', x: 4, y: 6 },
+        { id: 'r_z4', type: '兵', color: 'red', x: 6, y: 6 },
+        { id: 'r_z5', type: '兵', color: 'red', x: 8, y: 6 },
+
+        { id: 'b_c1', type: '車', color: 'black', x: 0, y: 0 },
+        { id: 'b_m1', type: '馬', color: 'black', x: 1, y: 0 },
+        { id: 'b_x1', type: '象', color: 'black', x: 2, y: 0 },
+        { id: 'b_s1', type: '士', color: 'black', x: 3, y: 0 },
+        { id: 'b_k0', type: '將', color: 'black', x: 4, y: 0 },
+        { id: 'b_s2', type: '士', color: 'black', x: 5, y: 0 },
+        { id: 'b_x2', type: '象', color: 'black', x: 6, y: 0 },
+        { id: 'b_m2', type: '馬', color: 'black', x: 7, y: 0 },
+        { id: 'b_c2', type: '車', color: 'black', x: 8, y: 0 },
+        { id: 'b_p1', type: '炮', color: 'black', x: 1, y: 2 },
+        { id: 'b_p2', type: '炮', color: 'black', x: 7, y: 2 },
+        { id: 'b_z1', type: '卒', color: 'black', x: 0, y: 3 },
+        { id: 'b_z2', type: '卒', color: 'black', x: 2, y: 3 },
+        { id: 'b_z3', type: '卒', color: 'black', x: 4, y: 3 },
+        { id: 'b_z4', type: '卒', color: 'black', x: 6, y: 3 },
+        { id: 'b_z5', type: '卒', color: 'black', x: 8, y: 3 }
+    ];
+    let pieces = [];
+
+    function resetPiecesData() {
+        pieces = JSON.parse(JSON.stringify(initialPieces));
+    }
+
+    function resizeBoard() {
+        const wrapper = document.getElementById('board-wrapper');
+        const container = document.getElementById('board-container');
+        const maxWidth = window.innerWidth - 30;
+        const baseWidth = 540;
+        
+        let scale = maxWidth < baseWidth ? maxWidth / baseWidth : 1;
+        container.style.transform = `scale(${scale})`;
+        wrapper.style.width = `${baseWidth * scale}px`;
+        wrapper.style.height = `${600 * scale}px`;
+        container.style.setProperty('--base-scale', scale);
+    }
+    window.addEventListener('resize', resizeBoard);
+    resizeBoard();
+
+    function getPieceWeight(type) {
+        switch(type) {
+            case '將':
+            case '帥': return 5;
+            case '車': return 4;
+            case '炮':
+            case '馬': return 3;
+            case '相':
+            case '象':
+            case '仕':
+            case '士': return 2;
+            case '兵':
+            case '卒': return 1;
+            default: return 1;
+        }
+    }
+
+    function toggleTextRotate() {
+        isTextRotated = !isTextRotated;
+        renderPieces();
+    }
+
+    function returnToMenu() {
+        if (confirm('確定要返回主選單嗎？目前的對局將會終止。')) {
+            gameActive = false;
+            if (peer) peer.destroy();
+            if (conn) conn.close();
+            document.getElementById('menu').style.display = 'flex';
+            document.getElementById('game-controls').style.display = 'none';
+            document.getElementById('status').innerText = "已返回主選單，請選擇對戰模式";
+            isTextRotated = false;
+            initPeer();
+        }
+    }
+
+    function initPeer(customId = undefined) {
+        if (peer) peer.destroy();
+        peer = new Peer(customId);
+
+        peer.on('open', (id) => {
+            document.getElementById('my-info').innerHTML = `網格代碼: <b style="color:var(--neon-blue)">${id}</b>`;
+        });
+
+        peer.on('connection', (connection) => {
+            conn = connection;
+            myRole = 'red'; 
+            setupConnection();
+            document.getElementById('status').innerText = "[ 網路接通 ] 輪到 紅方 執行指令";
+            gameActive = true;
+        });
+
+        peer.on('error', (err) => {
+            if (err.type === 'unavailable-id') {
+                alert('[ 錯誤 ] 此網格代碼已被佔用，請更換代碼！');
+            } else {
+                alert('[ 連線異常 ] 錯誤代碼: ' + err.type);
+            }
+        });
+    }
+
+    initPeer();
+
+    function startLocalGame() {
+        if (peer) peer.destroy();
+        isLocalMode = true;
+        gameActive = true;
+        currentTurn = 'red';
+        resetPiecesData();
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('game-controls').style.display = 'flex';
+        document.getElementById('status').innerText = "[ 本地模式 ] 輪到 紅方 執行指令";
+        renderPieces();
+    }
+
+    function createRoom() {
+        const customId = document.getElementById('room-input').value.trim();
+        if (!customId) return alert('請先輸入自訂房間代碼！');
+        isLocalMode = false;
+        resetPiecesData();
+        initPeer(customId);
+        alert(`[ 建立成功 ] 房間: ${customId} 已啟動，請將代碼傳給對手！`);
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('game-controls').style.display = 'flex';
+        gameActive = true;
+    }
+
+    function joinRoom() {
+        const friendId = document.getElementById('room-input').value.trim();
+        if (!friendId) return alert('請輸入欲接入的房間代碼！');
+
+        isLocalMode = false;
+        resetPiecesData();
+        conn = peer.connect(friendId);
+        myRole = 'black'; 
+        setupConnection();
+        document.getElementById('status').innerText = "[ 已接入系統 ] 等待紅方執行先手指令...";
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('game-controls').style.display = 'flex';
+        gameActive = true;
+    }
+
+    function setupConnection() {
+        conn.on('data', (data) => {
+            if (data.type === 'move') {
+                applyMove(data.fromX, data.fromY, data.toX, data.toY);
+                currentTurn = myRole;
+                document.getElementById('status').innerText = `[ 輪到你了 ] 執行權：${myRole === 'red' ? '紅方' : '藍方'}`;
+            }
+        });
+    }
+
+    function drawBoardLines() {
+        const container = document.getElementById('board-container');
+        for (let i = 0; i < 10; i++) {
+            let line = document.createElement('div');
+            line.className = 'line-h';
+            line.style.top = (OFFSET_Y + i * GRID_SIZE) + 'px';
+            container.appendChild(line);
+        }
+        for (let i = 0; i < 9; i++) {
+            let line = document.createElement('div');
+            line.className = 'line-v';
+            line.style.left = (OFFSET_X + i * GRID_SIZE) + 'px';
+            line.style.height = (4 * GRID_SIZE) + 'px';
+            line.style.top = OFFSET_Y + 'px';
+            container.appendChild(line);
+        }
+        for (let i = 0; i < 9; i++) {
+            let line = document.createElement('div');
+            line.className = 'line-v';
+            line.style.left = (OFFSET_X + i * GRID_SIZE) + 'px';
+            line.style.height = (4 * GRID_SIZE) + 'px';
+            line.style.top = (OFFSET_Y + 5 * GRID_SIZE) + 'px';
+            container.appendChild(line);
+        }
+        let cross1 = document.createElement('div');
+        cross1.className = 'cross';
+        cross1.style.top = (OFFSET_Y + 7 * GRID_SIZE) + 'px';
+        container.appendChild(cross1);
+
+        let cross2 = document.createElement('div');
+        cross2.className = 'cross';
+        cross2.style.top = (OFFSET_Y + 0) + 'px';
+        container.appendChild(cross2);
+    }
+    drawBoardLines();
+
+    function renderPieces() {
+        const container = document.getElementById('board-container');
+        document.querySelectorAll('.piece, .hint').forEach(el => el.remove());
+
+        pieces.forEach(p => {
+            let el = document.createElement('div');
+            el.className = `piece ${p.color}`;
+            if (selectedPiece && selectedPiece.x === p.x && selectedPiece.y === p.y) {
+                el.classList.add('selected');
+            }
+            el.innerText = p.type;
+            el.style.left = (OFFSET_X + p.x * GRID_SIZE) + 'px';
+            el.style.top = (OFFSET_Y + p.y * GRID_SIZE) + 'px';
+            
+            if (isTextRotated) {
+                el.style.transform = `translate(-50%, -50%) rotate(180deg)`;
+            } else {
+                el.style.transform = `translate(-50%, -50%)`;
+            }
+
+            el.onclick = (e) => {
+                e.stopPropagation();
+                handlePieceClick(p);
+            };
+            container.appendChild(el);
+        });
+
+        let canInteract = isLocalMode || (currentTurn === myRole);
+        if (selectedPiece && canInteract) {
+            let moves = getValidMoves(selectedPiece);
+            moves.forEach(m => {
+                let hint = document.createElement('div');
+                hint.className = 'hint';
+                hint.style.left = (OFFSET_X + m.x * GRID_SIZE) + 'px';
+                hint.style.top = (OFFSET_Y + m.y * GRID_SIZE) + 'px';
+                hint.onclick = (e) => {
+                    e.stopPropagation();
+                    executeMove(selectedPiece.x, selectedPiece.y, m.x, m.y);
+                };
+                container.appendChild(hint);
+            });
+        }
+    }
+
+    function triggerWeightedChromaEffect(x, y, targetType) {
+        const container = document.getElementById('board-container');
+        let weight = getPieceWeight(targetType); 
+
+        let maxScale = 2.0 + (weight * 0.6);       
+        let shakeIntensity = weight * 3.5;       
+        let brightnessVal = 1.0 + (weight * 0.25); 
+        let invertVal = weight >= 4 ? 1 : 0; 
+
+        let accentColor = ACCENT_COLORS[weight % ACCENT_COLORS.length];
+
+        container.style.borderColor = accentColor;
+        setTimeout(() => { container.style.borderColor = 'var(--neon-blue)'; }, 450);
+
+        container.classList.remove('shaking');
+        void container.offsetWidth; 
+        
+        container.style.setProperty('--shake-x1', `${(Math.random()-0.5)*shakeIntensity*2}px`);
+        container.style.setProperty('--shake-y1', `${(Math.random()-0.5)*shakeIntensity*2}px`);
+        container.style.setProperty('--shake-x2', `${(Math.random()-0.5)*shakeIntensity*1.5}px`);
+        container.style.setProperty('--shake-y2', `${(Math.random()-0.5)*shakeIntensity*1.5}px`);
+        container.style.setProperty('--shake-x3', `${(Math.random()-0.5)*shakeIntensity}px`);
+        container.style.setProperty('--shake-y3', `${(Math.random()-0.5)*shakeIntensity}px`);
+        container.style.setProperty('--shake-x4', `${(Math.random()-0.5)*(shakeIntensity*0.5)}px`);
+        container.style.setProperty('--shake-y4', `${(Math.random()-0.5)*(shakeIntensity*0.5)}px`);
+
+        container.style.setProperty('--fx-bright', brightnessVal);
+        container.style.setProperty('--fx-invert', invertVal);
+        
+        container.classList.add('shaking');
+
+        let ringCount = weight >= 4 ? 3 : (weight >= 2 ? 2 : 1);
+        for (let i = 0; i < ringCount; i++) {
+            let ring = document.createElement('div');
+            ring.className = 'weighted-kill-ring';
+            ring.style.left = (OFFSET_X + x * GRID_SIZE) + 'px';
+            ring.style.top = (OFFSET_Y + y * GRID_SIZE) + 'px';
+            ring.style.width = `${30 + (i * 10)}px`;
+            ring.style.height = `${30 + (i * 10)}px`;
+            ring.style.setProperty('--ring-color', i === 0 ? '#ffffff' : accentColor);
+            ring.style.setProperty('--final-scale', maxScale + (i * 0.5));
+            ring.style.animationDuration = `${0.4 + (i * 0.1)}s`;
+            container.appendChild(ring);
+
+            setTimeout(() => ring.remove(), 700);
+        }
+
+        let flash = document.createElement('div');
+        flash.className = 'weighted-kill-flash';
+        flash.style.setProperty('--flash-color', accentColor);
+        flash.style.setProperty('--flash-max', `${2.0 + (weight * 0.3)}`);
+        flash.style.left = (OFFSET_X + x * GRID_SIZE) + 'px';
+        flash.style.top = (OFFSET_Y + y * GRID_SIZE) + 'px';
+        container.appendChild(flash);
+        setTimeout(() => flash.remove(), 350);
+    }
+
+    function getPieceAt(x, y) {
+        return pieces.find(p => p.x === x && p.y === y);
+    }
+
+    function handlePieceClick(p) {
+        if (!gameActive) return;
+
+        if (isLocalMode) {
+            if (p.color === currentTurn) {
+                selectedPiece = p;
+                renderPieces();
+            } else if (selectedPiece) {
+                let moves = getValidMoves(selectedPiece);
+                if (moves.some(m => m.x === p.x && m.y === p.y)) {
+                    executeMove(selectedPiece.x, selectedPiece.y, p.x, p.y);
+                }
+            }
+        } else {
+            if (currentTurn !== myRole) return alert('[ 等待中 ] 還沒輪到您的執行權限！');
+
+            if (p.color === myRole) {
+                selectedPiece = p;
+                renderPieces();
+            } else if (selectedPiece) {
+                let moves = getValidMoves(selectedPiece);
+                if (moves.some(m => m.x === p.x && m.y === p.y)) {
+                    executeMove(selectedPiece.x, selectedPiece.y, p.x, p.y);
+                }
+            }
+        }
+    }
+
+    function executeMove(fromX, fromY, toX, toY) {
+        applyMove(fromX, fromY, toX, toY);
+        
+        if (!isLocalMode) {
+            if (conn && conn.open) {
+                conn.send({ type: 'move', fromX, fromY, toX, toY });
+            }
+            currentTurn = (myRole === 'red' ? 'black' : 'red');
+            document.getElementById('status').innerText = `[ 網路等待 ] 敵方正在執行回應指令...`;
+        } else {
+            currentTurn = (currentTurn === 'red' ? 'black' : 'red');
+            document.getElementById('status').innerText = `[ 本地模式 ] 輪到 ${currentTurn === 'red' ? '紅方' : '藍方'} 執行指令`;
+        }
+
+        selectedPiece = null;
+        renderPieces();
+    }
+
+    function applyMove(fromX, fromY, toX, toY) {
+        let targetPiece = getPieceAt(toX, toY);
+        let movingPiece = getPieceAt(fromX, fromY);
+
+        if (targetPiece) {
+            triggerWeightedChromaEffect(toX, toY, targetPiece.type);
+
+            pieces = pieces.filter(p => p !== targetPiece);
+            if (targetPiece.type === '將' || targetPiece.type === '帥') {
+                alert(`[ 遊戲終止 ] 核心已被摧毀！獲勝方：${movingPiece.color === 'red' ? '紅方' : '藍方'}`);
+                gameActive = false;
+            }
+        }
+
+        movingPiece.x = toX;
+        movingPiece.y = toY;
+        renderPieces();
+    }
+
+    function getValidMoves(p) {
+        let moves = [];
+        let color = p.color;
+
+        function addIfValid(x, y) {
+            if (x >= 0 && x < BOARD_COLS && y >= 0 && y < BOARD_ROWS) {
+                let target = getPieceAt(x, y);
+                if (!target || target.color !== color) {
+                    moves.push({ x, y });
+                }
+            }
+        }
+
+        switch (p.type) {
+            case '帥':
+            case '將':
+                // 1. 九宮格內的常規移動
+                let kingLimits = color === 'red' ? {ymin: 7, ymax: 9, xmin: 3, xmax: 5} : {ymin: 0, ymax: 2, xmin: 3, xmax: 5};
+                [[0,1],[0,-1],[1,0],[-1,0]].forEach(d => {
+                    let nx = p.x + d[0], ny = p.y + d[1];
+                    if (nx >= kingLimits.xmin && nx <= kingLimits.xmax && ny >= kingLimits.ymin && ny <= kingLimits.ymax) {
+                        addIfValid(nx, ny);
+                    }
+                });
+
+                // 2. ⚡ [飛將特性] 王見王：直接跨越全盤抓對方的王
+                let opponentKing = pieces.find(tp => (tp.type === '將' || tp.type === '帥') && tp.color !== color);
+                if (opponentKing && opponentKing.x === p.x) {
+                    // 檢查兩王之間是否有其他阻擋棋子
+                    let minY = Math.min(p.y, opponentKing.y);
+                    let maxY = Math.max(p.y, opponentKing.y);
+                    let hasObstacle = false;
+                    for (let y = minY + 1; y < maxY; y++) {
+                        if (getPieceAt(p.x, y)) {
+                            hasObstacle = true;
+                            break;
+                        }
+                    }
+                    if (!hasObstacle) {
+                        moves.push({ x: opponentKing.x, y: opponentKing.y });
+                    }
+                }
+                break;
+            case '仕':
+            case '士':
+                let guardLimits = color === 'red' ? {ymin: 7, ymax: 9, xmin: 3, xmax: 5} : {ymin: 0, ymax: 2, xmin: 3, xmax: 5};
+                [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(d => {
+                    let nx = p.x + d[0], ny = p.y + d[1];
+                    if (nx >= guardLimits.xmin && nx <= guardLimits.xmax && ny >= guardLimits.ymin && ny <= guardLimits.ymax) {
+                        addIfValid(nx, ny);
+                    }
+                });
+                break;
+            case '相':
+            case '象':
+                [[2,2],[2,-2],[-2,2],[-2,-2]].forEach(d => {
+                    let nx = p.x + d[0], ny = p.y + d[1];
+                    let bx = p.x + d[0]/2, by = p.y + d[1]/2;
+                    let riverLimit = color === 'red' ? ny >= 5 : ny <= 4;
+                    if (riverLimit && !getPieceAt(bx, by)) {
+                        addIfValid(nx, ny);
+                    }
+                });
+                break;
+            case '馬':
+                const horseDirs = [[1,2],[2,1],[2,-1],[1,-2],[-1,-2],[-2,-1],[-2,1],[-1,2]];
+                horseDirs.forEach(d => {
+                    let nx = p.x + d[0], ny = p.y + d[1];
+                    let bx = p.x + (Math.abs(d[0]) === 2 ? d[0]/2 : 0);
+                    let by = p.y + (Math.abs(d[1]) === 2 ? d[1]/2 : 0);
+                    if (!getPieceAt(bx, by)) {
+                        addIfValid(nx, ny);
+                    }
+                });
+                break;
+            case '車':
+                [[1,0],[-1,0],[0,1],[0,-1]].forEach(d => {
+                    let nx = p.x + d[0], ny = p.y + d[1];
+                    while (nx >= 0 && nx < BOARD_COLS && ny >= 0 && ny < BOARD_ROWS) {
+                        let target = getPieceAt(nx, ny);
+                        if (!target) {
+                            moves.push({ x: nx, y: ny });
+                        } else {
+                            if (target.color !== color) moves.push({ x: nx, y: ny });
+                            break;
+                        }
+                        nx += d[0]; ny += d[1];
+                    }
+                });
+                break;
+            case '炮':
+                [[1,0],[-1,0],[0,1],[0,-1]].forEach(d => {
+                    let nx = p.x + d[0], ny = p.y + d[1];
+                    let hopped = false;
+                    while (nx >= 0 && nx < BOARD_COLS && ny >= 0 && ny < BOARD_ROWS) {
+                        let target = getPieceAt(nx, ny);
+                        if (!hopped) {
+                            if (!target) {
+                                moves.push({ x: nx, y: ny });
+                            } else {
+                                hopped = true;
+                            }
+                        } else {
+                            if (target) {
+                                if (target.color !== color) moves.push({ x: nx, y: ny });
+                                break;
+                            }
+                        }
+                        nx += d[0]; ny += d[1];
+                    }
+                });
+                break;
+            case '兵':
+            case '卒':
+                let forward = color === 'red' ? -1 : 1;
+                let crossed = color === 'red' ? p.y < 5 : p.y > 4;
+                addIfValid(p.x, p.y + forward);
+                if (crossed) {
+                    addIfValid(p.x - 1, p.y);
+                    addIfValid(p.x + 1, p.y);
+                }
+                break;
+        }
+        return moves;
+    }
+
+    resetPiecesData();
+    renderPieces();
+</script>
+
+</body>
+</html>
