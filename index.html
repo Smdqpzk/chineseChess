@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CYBER_CHESS // 2077 - 王見王飛將模式</title>
+    <title>CYBER_CHESS</title>
     <!-- 引入 PeerJS CDN -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
@@ -182,7 +182,6 @@
             transition: border-color 0.3s ease;
         }
 
-        /* 黑白與跳色反相畫面震動特效 */
         @keyframes screenShakeBW {
             0% { transform: translate(0, 0) scale(var(--base-scale, 1)); filter: grayscale(0) brightness(1) invert(0); }
             20% { transform: translate(var(--shake-x1), var(--shake-y1)) scale(var(--base-scale, 1)); filter: grayscale(1) brightness(var(--fx-bright)) invert(var(--fx-invert)); }
@@ -300,7 +299,6 @@
             100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.6; }
         }
 
-        /* 黑白與跳色震波環特效 */
         .weighted-kill-ring {
             position: absolute;
             border-radius: 50%;
@@ -344,7 +342,7 @@
 </head>
 <body>
 
-    <h1>[ SYSTEM // HOLO_CHESS ]</h1>
+    <h1>[ SYSTEM // CHESS ]</h1>
     
     <div id="menu">
         <div id="my-info">INITIALIZING NEURAL LINK...</div>
@@ -354,14 +352,14 @@
         </div>
         <div class="input-group">
             <input type="text" id="room-input" placeholder="輸入自訂房間代碼 (例: NEXUS_01)">
-            <button onclick="createRoom()" class="secondary">建立全息房</button>
+            <button onclick="createRoom()" class="secondary">建立房間</button>
             <button onclick="joinRoom()">接入房間</button>
         </div>
     </div>
 
     <div id="game-controls" style="display: none;">
-        <button onclick="toggleTextRotate()" class="secondary">🔄 反轉棋子文字</button>
-        <button onclick="returnToMenu()" class="danger">🏠 返回主選單</button>
+        <button onclick="toggleTextRotate()" class="secondary">反轉棋子文字</button>
+        <button onclick="returnToMenu()" class="danger">返回主選單</button>
     </div>
 
     <div id="status">請選擇對戰模式 (本地或網路)</div>
@@ -381,7 +379,7 @@
 
     let peer = null;
     let conn = null;
-    let myRole = null; 
+    let myRole = 'red'; // 預設紅方
     let currentTurn = 'red'; 
     let selectedPiece = null;
     let gameActive = false;
@@ -429,6 +427,14 @@
 
     function resetPiecesData() {
         pieces = JSON.parse(JSON.stringify(initialPieces));
+    }
+
+    // 座標轉換：如果是 Black 視角，將棋盤座標上下左右鏡像反轉
+    function transformCoords(x, y) {
+        if (!isLocalMode && myRole === 'black') {
+            return { x: 8 - x, y: 9 - y };
+        }
+        return { x, y };
     }
 
     function resizeBoard() {
@@ -491,10 +497,11 @@
 
         peer.on('connection', (connection) => {
             conn = connection;
-            myRole = 'red'; 
+            myRole = 'red'; // 建立房間者為紅方
             setupConnection();
             document.getElementById('status').innerText = "[ 網路接通 ] 輪到 紅方 執行指令";
             gameActive = true;
+            renderPieces();
         });
 
         peer.on('error', (err) => {
@@ -511,6 +518,7 @@
     function startLocalGame() {
         if (peer) peer.destroy();
         isLocalMode = true;
+        myRole = 'red';
         gameActive = true;
         currentTurn = 'red';
         resetPiecesData();
@@ -524,12 +532,14 @@
         const customId = document.getElementById('room-input').value.trim();
         if (!customId) return alert('請先輸入自訂房間代碼！');
         isLocalMode = false;
+        myRole = 'red'; // 房主為紅方
         resetPiecesData();
         initPeer(customId);
         alert(`[ 建立成功 ] 房間: ${customId} 已啟動，請將代碼傳給對手！`);
         document.getElementById('menu').style.display = 'none';
         document.getElementById('game-controls').style.display = 'flex';
         gameActive = true;
+        renderPieces();
     }
 
     function joinRoom() {
@@ -537,22 +547,26 @@
         if (!friendId) return alert('請輸入欲接入的房間代碼！');
 
         isLocalMode = false;
+        myRole = 'black'; // 加入房間者為黑方
         resetPiecesData();
         conn = peer.connect(friendId);
-        myRole = 'black'; 
         setupConnection();
         document.getElementById('status').innerText = "[ 已接入系統 ] 等待紅方執行先手指令...";
         document.getElementById('menu').style.display = 'none';
         document.getElementById('game-controls').style.display = 'flex';
         gameActive = true;
+        renderPieces();
     }
 
     function setupConnection() {
         conn.on('data', (data) => {
             if (data.type === 'move') {
-                applyMove(data.fromX, data.fromY, data.toX, data.toY);
+                // 對方傳來的座標是依據對方的視角，需要轉回真實棋盤座標再套用
+                let realFrom = transformCoords(data.fromX, data.fromY);
+                let realTo = transformCoords(data.toX, data.toY);
+                applyMove(realFrom.x, realFrom.y, realTo.x, realTo.y);
                 currentTurn = myRole;
-                document.getElementById('status').innerText = `[ 輪到你了 ] 執行權：${myRole === 'red' ? '紅方' : '藍方'}`;
+                document.getElementById('status').innerText = `[ 輪到你了 ] 執行權：${myRole === 'red' ? '紅方' : '黑方'}`;
             }
         });
     }
@@ -598,14 +612,17 @@
         document.querySelectorAll('.piece, .hint').forEach(el => el.remove());
 
         pieces.forEach(p => {
+            // 套用視角轉換 (如果是黑方，將座標鏡像翻轉至下方)
+            let pos = transformCoords(p.x, p.y);
+
             let el = document.createElement('div');
             el.className = `piece ${p.color}`;
             if (selectedPiece && selectedPiece.x === p.x && selectedPiece.y === p.y) {
                 el.classList.add('selected');
             }
             el.innerText = p.type;
-            el.style.left = (OFFSET_X + p.x * GRID_SIZE) + 'px';
-            el.style.top = (OFFSET_Y + p.y * GRID_SIZE) + 'px';
+            el.style.left = (OFFSET_X + pos.x * GRID_SIZE) + 'px';
+            el.style.top = (OFFSET_Y + pos.y * GRID_SIZE) + 'px';
             
             if (isTextRotated) {
                 el.style.transform = `translate(-50%, -50%) rotate(180deg)`;
@@ -624,10 +641,11 @@
         if (selectedPiece && canInteract) {
             let moves = getValidMoves(selectedPiece);
             moves.forEach(m => {
+                let hintPos = transformCoords(m.x, m.y);
                 let hint = document.createElement('div');
                 hint.className = 'hint';
-                hint.style.left = (OFFSET_X + m.x * GRID_SIZE) + 'px';
-                hint.style.top = (OFFSET_Y + m.y * GRID_SIZE) + 'px';
+                hint.style.left = (OFFSET_X + hintPos.x * GRID_SIZE) + 'px';
+                hint.style.top = (OFFSET_Y + hintPos.y * GRID_SIZE) + 'px';
                 hint.onclick = (e) => {
                     e.stopPropagation();
                     executeMove(selectedPiece.x, selectedPiece.y, m.x, m.y);
@@ -637,8 +655,9 @@
         }
     }
 
-    function triggerWeightedChromaEffect(x, y, targetType) {
+    function triggerWeightedChromaEffect(realX, realY, targetType) {
         const container = document.getElementById('board-container');
+        let pos = transformCoords(realX, realY);
         let weight = getPieceWeight(targetType); 
 
         let maxScale = 2.0 + (weight * 0.6);       
@@ -672,8 +691,8 @@
         for (let i = 0; i < ringCount; i++) {
             let ring = document.createElement('div');
             ring.className = 'weighted-kill-ring';
-            ring.style.left = (OFFSET_X + x * GRID_SIZE) + 'px';
-            ring.style.top = (OFFSET_Y + y * GRID_SIZE) + 'px';
+            ring.style.left = (OFFSET_X + pos.x * GRID_SIZE) + 'px';
+            ring.style.top = (OFFSET_Y + pos.y * GRID_SIZE) + 'px';
             ring.style.width = `${30 + (i * 10)}px`;
             ring.style.height = `${30 + (i * 10)}px`;
             ring.style.setProperty('--ring-color', i === 0 ? '#ffffff' : accentColor);
@@ -688,8 +707,8 @@
         flash.className = 'weighted-kill-flash';
         flash.style.setProperty('--flash-color', accentColor);
         flash.style.setProperty('--flash-max', `${2.0 + (weight * 0.3)}`);
-        flash.style.left = (OFFSET_X + x * GRID_SIZE) + 'px';
-        flash.style.top = (OFFSET_Y + y * GRID_SIZE) + 'px';
+        flash.style.left = (OFFSET_X + pos.x * GRID_SIZE) + 'px';
+        flash.style.top = (OFFSET_Y + pos.y * GRID_SIZE) + 'px';
         container.appendChild(flash);
         setTimeout(() => flash.remove(), 350);
     }
@@ -731,13 +750,16 @@
         
         if (!isLocalMode) {
             if (conn && conn.open) {
-                conn.send({ type: 'move', fromX, fromY, toX, toY });
+                // 傳送給對方時，將座標轉為對方的視角再發送
+                let sendFrom = transformCoords(fromX, fromY);
+                let sendTo = transformCoords(toX, toY);
+                conn.send({ type: 'move', fromX: sendFrom.x, fromY: sendFrom.y, toX: sendTo.x, toY: sendTo.y });
             }
             currentTurn = (myRole === 'red' ? 'black' : 'red');
             document.getElementById('status').innerText = `[ 網路等待 ] 敵方正在執行回應指令...`;
         } else {
             currentTurn = (currentTurn === 'red' ? 'black' : 'red');
-            document.getElementById('status').innerText = `[ 本地模式 ] 輪到 ${currentTurn === 'red' ? '紅方' : '藍方'} 執行指令`;
+            document.getElementById('status').innerText = `[ 本地模式 ] 輪到 ${currentTurn === 'red' ? '紅方' : '黑方'} 執行指令`;
         }
 
         selectedPiece = null;
@@ -753,7 +775,7 @@
 
             pieces = pieces.filter(p => p !== targetPiece);
             if (targetPiece.type === '將' || targetPiece.type === '帥') {
-                alert(`[ 遊戲終止 ] 核心已被摧毀！獲勝方：${movingPiece.color === 'red' ? '紅方' : '藍方'}`);
+                alert(`[ 遊戲終止 ] 核心已被摧毀！獲勝方：${movingPiece.color === 'red' ? '紅方' : '黑方'}`);
                 gameActive = false;
             }
         }
@@ -779,7 +801,6 @@
         switch (p.type) {
             case '帥':
             case '將':
-                // 1. 九宮格內的常規移動
                 let kingLimits = color === 'red' ? {ymin: 7, ymax: 9, xmin: 3, xmax: 5} : {ymin: 0, ymax: 2, xmin: 3, xmax: 5};
                 [[0,1],[0,-1],[1,0],[-1,0]].forEach(d => {
                     let nx = p.x + d[0], ny = p.y + d[1];
@@ -788,10 +809,9 @@
                     }
                 });
 
-                // 2. ⚡ [飛將特性] 王見王：直接跨越全盤抓對方的王
+                // 王見王飛將特性
                 let opponentKing = pieces.find(tp => (tp.type === '將' || tp.type === '帥') && tp.color !== color);
                 if (opponentKing && opponentKing.x === p.x) {
-                    // 檢查兩王之間是否有其他阻擋棋子
                     let minY = Math.min(p.y, opponentKing.y);
                     let maxY = Math.max(p.y, opponentKing.y);
                     let hasObstacle = false;
